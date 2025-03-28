@@ -1,0 +1,62 @@
+name: Android arm64 Static Build Libcap
+
+on:
+  workflow_dispatch:
+  push:
+    branches: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r26
+
+    - name: Install dependencies
+      run: sudo apt-get install -y gcc perl
+
+    - name: Clone Google's libcap
+      run: git clone https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap
+
+    - name: Generate cap_names.list.h
+      run: |
+        cd libcap/libcap
+        perl -e 'while ($l=<>) { if ($l =~ /^\#define[ \t](CAP[_A-Z]+)[ \t]+([0-9]+)\s+$/) { $tok=$1; $val=$2; $tok =~ tr/A-Z/a-z/; print "{\"$tok\",$val},\n"; } }' ../libcap/include/uapi/linux/capability.h | grep -v 0x > cap_names.list.h
+
+    - name: Build _makenames (host tool)
+      run: |
+        cd libcap/libcap
+        gcc -O2 -I../libcap/include/uapi -I../libcap/include _makenames.c -o _makenames
+
+    - name: Generate cap_names.h
+      run: |
+        cd libcap/libcap
+        ./_makenames > cap_names.h
+
+    - name: Build only progs (static)
+      run: |
+        cd libcap
+        export NDK_TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+        export TARGET=aarch64-linux-android
+        export API=33
+
+        # 仅编译程序，不编译库
+        make -C progs \
+          CC="$NDK_TOOLCHAIN/${TARGET}${API}-clang -static" \
+          AR="$NDK_TOOLCHAIN/llvm-ar" \
+          OBJCOPY="$NDK_TOOLCHAIN/llvm-objcopy" \
+          BUILD_STATIC=yes \
+          SHARED=no \
+          PTHREADS=no \
+          PAM_CAP=no \
+          RAISE_SETFCAP=no
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4.3.1
+      with:
+        name: android-arm64-libcap-static
+        path: libcap/progs/*
