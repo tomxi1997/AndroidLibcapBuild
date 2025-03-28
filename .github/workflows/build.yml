@@ -55,14 +55,10 @@ jobs:
           PAM_CAP=no \
           RAISE_SETFCAP=no
 
-    - name: Strip binaries
-      run: |
-        mkdir -p libcap/install/bin
-        cp libcap/progs/capsh libcap/install/bin/
-        cp libcap/progs/getcap libcap/install/bin/
-        cp libcap/progs/getpcaps libcap/install/bin/
-        cp libcap/progs/setcap libcap/install/bin/
-        $NDK_TOOLCHAIN/llvm-strip libcap/install/bin/*
+        mkdir -p install/bin
+        cp progs/setcap progs/getcap progs/getpcaps progs/capsh install/bin/
+        
+        $NDK_TOOLCHAIN/llvm-strip install/bin/*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4.3.1
