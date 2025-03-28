@@ -58,10 +58,10 @@ jobs:
     - name: Strip binaries
       run: |
         mkdir -p libcap/install/bin
-        cp libcap/progs/capsh libcap/install/bin
-        cp libcap/progs/getcap libcap/install/bin
-        cp libcap/progs/getcaps libcap/install/bin
-        cp libcap/progs/setcap libcap/install/bin
+        cp libcap/progs/capsh libcap/install/bin/
+        cp libcap/progs/getcap libcap/install/bin/
+        cp libcap/progs/getpcaps libcap/install/bin/
+        cp libcap/progs/setcap libcap/install/bin/
         $NDK_TOOLCHAIN/llvm-strip libcap/install/bin/*
 
     - name: Upload artifacts
