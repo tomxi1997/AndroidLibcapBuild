@@ -3,10 +3,6 @@ name: Android Static Build Libcap
 on:
   workflow_dispatch:
     inputs:
-      libcap_repo:
-        description: 'Libcap repository URL'
-        required: false
-        default: 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'
       target_arch:
         description: 'Target architecture (aarch64/arm/x86_64/i686)'
         required: false
@@ -40,7 +36,7 @@ jobs:
 
     - name: Clone libcap
       run: |
-        git clone "${{ github.event.inputs.libcap_repo || 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'}}" libcap
+        git clone https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap libcap
 
     - name: Set build parameters
       id: vars
