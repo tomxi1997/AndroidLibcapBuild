@@ -1,9 +1,28 @@
-name: Android arm64 Static Build Libcap
+name: Android Static Build Libcap
 
 on:
   workflow_dispatch:
-  push:
-    branches: main
+    inputs:
+      libcap_repo:
+        description: 'Libcap repository URL'
+        required: false
+        default: 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'
+      target_arch:
+        description: 'Target architecture (aarch64/arm/x86_64/i686)'
+        required: false
+        default: 'aarch64'
+      ndk_version:
+        description: 'Android NDK version'
+        required: false
+        default: 'r26'
+      android_api:
+        description: 'Android API level'
+        required: false
+        default: '33'
+      build_tools:
+        description: 'Tools to build (comma separated: setcap,getcap,getpcaps,capsh)'
+        required: false
+        default: 'setcap,getcap,getpcaps,capsh'
 
 jobs:
   build:
@@ -14,13 +33,30 @@ jobs:
     - name: Set up Android NDK
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r26
+        ndk-version: ${{ github.event.inputs.ndk_version || 'r26' }}
 
     - name: Install dependencies
       run: sudo apt-get install -y gcc perl
 
-    - name: Clone Google's libcap
-      run: git clone https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap
+    - name: Clone libcap
+      run: |
+        git clone "${{ github.event.inputs.libcap_repo || 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'}" libcap
+
+    - name: Set build parameters
+      id: vars
+      run: |
+        # Set target triple based on architecture
+        case "${{ github.event.inputs.target_arch || 'aarch64' }}" in
+          aarch64) target="aarch64-linux-android" ;;
+          arm) target="armv7a-linux-androideabi" ;;
+          x86_64) target="x86_64-linux-android" ;;
+          i686) target="i686-linux-android" ;;
+          *) echo "Unsupported architecture"; exit 1 ;;
+        esac
+        
+        echo "target=$target" >> $GITHUB_OUTPUT
+        echo "api=${{ github.event.inputs.android_api || '33' }}" >> $GITHUB_OUTPUT
+        echo "tools=${{ github.event.inputs.build_tools || 'setcap,getcap,getpcaps' }}" >> $GITHUB_OUTPUT
 
     - name: Generate cap_names.list.h
       run: |
@@ -37,14 +73,14 @@ jobs:
         cd libcap/libcap
         ./_makenames > cap_names.h
 
-    - name: Build only progs (static)
+    - name: Build selected tools (static)
       run: |
         cd libcap
         export NDK_TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
-        export TARGET=aarch64-linux-android
-        export API=33
-
-        # 仅编译程序，不编译库
+        export TARGET=${{ steps.vars.outputs.target }}
+        export API=${{ steps.vars.outputs.api }}
+        
+        # Build only specified tools
         make -C progs \
           CC="$NDK_TOOLCHAIN/${TARGET}${API}-clang -static" \
           AR="$NDK_TOOLCHAIN/llvm-ar" \
@@ -55,13 +91,18 @@ jobs:
           PAM_CAP=no \
           RAISE_SETFCAP=no
 
+        # Create output directory
         mkdir -p install/bin
-        cp progs/setcap progs/getcap progs/getpcaps progs/capsh install/bin/
         
-        $NDK_TOOLCHAIN/llvm-strip install/bin/*
+        # Copy only requested tools
+        IFS=',' read -ra TOOLS <<< "${{ steps.vars.outputs.tools }}"
+        for tool in "${TOOLS[@]}"; do
+          cp "progs/$tool" install/bin/
+          $NDK_TOOLCHAIN/llvm-strip "install/bin/$tool"
+        done
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4.3.1
       with:
-        name: android-arm64-libcap-static
+        name: android-${{ github.event.inputs.target_arch || 'aarch64' }}-libcap-static
         path: libcap/install/bin/*
