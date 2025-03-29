@@ -40,7 +40,7 @@ jobs:
 
     - name: Clone libcap
       run: |
-        git clone "${{ github.event.inputs.libcap_repo || 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'}" libcap
+        git clone "${{ github.event.inputs.libcap_repo || 'https://kernel.googlesource.com/pub/scm/linux/kernel/git/morgan/libcap'}}" libcap
 
     - name: Set build parameters
       id: vars
