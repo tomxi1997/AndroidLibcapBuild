@@ -10,15 +10,11 @@ on:
       ndk_version:
         description: 'Android NDK version'
         required: false
-        default: 'r26'
+        default: 'r27c'
       android_api:
         description: 'Android API level'
         required: false
-        default: '33'
-      build_tools:
-        description: 'Tools to build (comma separated: setcap,getcap,getpcaps,capsh)'
-        required: false
-        default: 'setcap,getcap,getpcaps,capsh'
+        default: '30'
 
 jobs:
   build:
@@ -29,7 +25,7 @@ jobs:
     - name: Set up Android NDK
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: ${{ github.event.inputs.ndk_version || 'r26' }}
+        ndk-version: ${{ github.event.inputs.ndk_version || 'r27c' }}
 
     - name: Install dependencies
       run: sudo apt-get install -y gcc perl
@@ -51,23 +47,8 @@ jobs:
         esac
         
         echo "target=$target" >> $GITHUB_OUTPUT
-        echo "api=${{ github.event.inputs.android_api || '33' }}" >> $GITHUB_OUTPUT
+        echo "api=${{ github.event.inputs.android_api || '30' }}" >> $GITHUB_OUTPUT
         echo "tools=${{ github.event.inputs.build_tools || 'setcap,getcap,getpcaps' }}" >> $GITHUB_OUTPUT
-
-    - name: Generate cap_names.list.h
-      run: |
-        cd libcap/libcap
-        perl -e 'while ($l=<>) { if ($l =~ /^\#define[ \t](CAP[_A-Z]+)[ \t]+([0-9]+)\s+$/) { $tok=$1; $val=$2; $tok =~ tr/A-Z/a-z/; print "{\"$tok\",$val},\n"; } }' ../libcap/include/uapi/linux/capability.h | grep -v 0x > cap_names.list.h
-
-    - name: Build _makenames (host tool)
-      run: |
-        cd libcap/libcap
-        gcc -O2 -I../libcap/include/uapi -I../libcap/include _makenames.c -o _makenames
-
-    - name: Generate cap_names.h
-      run: |
-        cd libcap/libcap
-        ./_makenames > cap_names.h
 
     - name: Build selected tools (static)
       run: |
@@ -76,27 +57,28 @@ jobs:
         export TARGET=${{ steps.vars.outputs.target }}
         export API=${{ steps.vars.outputs.api }}
         
-        # Build only specified tools
-        make -C progs \
-          CC="$NDK_TOOLCHAIN/${TARGET}${API}-clang" \
-          AR="$NDK_TOOLCHAIN/llvm-ar" \
-          OBJCOPY="$NDK_TOOLCHAIN/llvm-objcopy" \
-          PTHREADS=no \
-          PAM_CAP=no \
-          RAISE_SETFCAP=no
-
-        # Create output directory
-        mkdir -p install/bin
-        
-        # Copy only requested tools
-        IFS=',' read -ra TOOLS <<< "${{ steps.vars.outputs.tools }}"
-        for tool in "${TOOLS[@]}"; do
-          cp "progs/$tool" install/bin/
-          $NDK_TOOLCHAIN/llvm-strip "install/bin/$tool"
-        done
+        find ./* -type f -exec sed -i 's/-lpthread/-lc/g' {} \;
+        BUILD_CC=gcc make CC="$NDK_TOOLCHAIN/clang --target=$TARGET$API" AR=$NDK_TOOLCHAIN/llvm-ar \
+        RANLIB=$NDK_TOOLCHAIN/llvm-ranlib OBJCOPY=$NDK_TOOLCHAIN/llvm-objcopy PREFIX=/data/sysroot
+        sudo make install DESTDIR=/data/sysroot
+        echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4.3.1
       with:
-        name: android-${{ github.event.inputs.target_arch || 'aarch64' }}-libcap
-        path: libcap/install/*
+        name: android-${{ github.event.inputs.target_arch || 'aarch64' }}-libcap-dev
+        path: /data/sysroot/*
+
+    - name: Create a ZIP file for artifact
+      run: zip -r android-${{ github.event.inputs.target_arch || 'aarch64' }}-libcap-dev.zip /data/sysroot/*
+    
+    - name: Create Release and Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_DATE }}
+        name: Release ${{ env.RELEASE_DATE }}
+        body: TODO New Release.
+        draft: false
+        prerelease: false
+        files: |
+            android-${{ github.event.inputs.target_arch || 'aarch64' }}-libcap-dev.zip
