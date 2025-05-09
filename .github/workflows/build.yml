@@ -48,7 +48,6 @@ jobs:
         
         echo "target=$target" >> $GITHUB_OUTPUT
         echo "api=${{ github.event.inputs.android_api || '30' }}" >> $GITHUB_OUTPUT
-        echo "tools=${{ github.event.inputs.build_tools || 'setcap,getcap,getpcaps' }}" >> $GITHUB_OUTPUT
 
     - name: Build selected tools (static)
       run: |
@@ -58,6 +57,7 @@ jobs:
         export API=${{ steps.vars.outputs.api }}
         
         find ./* -type f -exec sed -i 's/-lpthread/-lc/g' {} \;
+        sed -i 's/ifeq ($(GOLANG),yes)/ifeq ($(GOLANG),no)/g' Makefile
         BUILD_CC=gcc make CC="$NDK_TOOLCHAIN/clang --target=$TARGET$API" AR=$NDK_TOOLCHAIN/llvm-ar \
         RANLIB=$NDK_TOOLCHAIN/llvm-ranlib OBJCOPY=$NDK_TOOLCHAIN/llvm-objcopy PREFIX=/data/sysroot
         sudo make install DESTDIR=/data/sysroot
