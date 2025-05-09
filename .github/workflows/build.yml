@@ -59,7 +59,8 @@ jobs:
         find ./* -type f -exec sed -i 's/-lpthread/-lc/g' {} \;
         sed -i 's/ifeq ($(GOLANG),yes)/ifeq ($(GOLANG),no)/g' Makefile
         BUILD_CC=gcc make CC="$NDK_TOOLCHAIN/clang --target=$TARGET$API" AR=$NDK_TOOLCHAIN/llvm-ar \
-        RANLIB=$NDK_TOOLCHAIN/llvm-ranlib OBJCOPY=$NDK_TOOLCHAIN/llvm-objcopy PREFIX=/data/sysroot
+        RANLIB=$NDK_TOOLCHAIN/llvm-ranlib OBJCOPY=$NDK_TOOLCHAIN/llvm-objcopy PREFIX=/data/sysroot \
+        prefix=/data/sysroot
         sudo make install DESTDIR=/data/sysroot
         echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
