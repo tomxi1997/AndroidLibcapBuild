@@ -58,7 +58,7 @@ jobs:
         
         find ./* -type f -exec sed -i 's/-lpthread/-lc/g' {} \;
         sed -i 's/ifeq ($(GOLANG),yes)/ifeq ($(GOLANG),no)/g' Makefile
-        sed 's|(inc_prefix)/include|(inc_prefix)/usr/include|g' libcap/Makefile
+        sed -i 's|(inc_prefix)/include|(inc_prefix)/usr/include|g' libcap/Makefile
         
         BUILD_CC=gcc make CC="$NDK_TOOLCHAIN/clang --target=$TARGET$API" AR=$NDK_TOOLCHAIN/llvm-ar \
         RANLIB=$NDK_TOOLCHAIN/llvm-ranlib OBJCOPY=$NDK_TOOLCHAIN/llvm-objcopy PREFIX=/data/sysroot \
